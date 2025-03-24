@@ -5,9 +5,6 @@ import os
 
 app = Flask(__name__)
 
-# -----------------------
-# Trie Implementation
-# -----------------------
 class TrieNode:
     def __init__(self):
         self.children = defaultdict(TrieNode)
@@ -35,10 +32,8 @@ class Trie:
 
 trie = Trie()
 
-# -----------------------
-# Caption Fetcher & Indexer
-# -----------------------
 def fetch_and_index(video_url):
+    print(f"Starting yt-dlp for {video_url}")
     ydl_opts = {
         'writesubtitles': True,
         'skip_download': True,
@@ -46,28 +41,31 @@ def fetch_and_index(video_url):
         'outtmpl': '%(id)s.%(ext)s'
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(video_url, download=False)
-        video_id = info.get('id', '')
-        caption_file = f"{video_id}.en.vtt"
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+            video_id = info.get('id', '')
+            caption_file = f"{video_id}.en.vtt"
 
-        if not os.path.exists(caption_file):
-            return f"No captions found for {video_url}", []
+            if not os.path.exists(caption_file):
+                print(f"No captions downloaded for video ID: {video_id}")
+                return "No captions found or subtitles unavailable.", []
 
-        with open(caption_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip() and "-->":
-                    continue
-                words = line.strip().lower().split()
-                if words:
-                    trie.insert(words, video_id)
+            with open(caption_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip() and "-->":
+                        continue
+                    words = line.strip().lower().split()
+                    if words:
+                        trie.insert(words, video_id)
 
-        os.remove(caption_file)
-        return f"Indexed {video_url}", video_id
+            os.remove(caption_file)
+            print(f"Indexed video ID: {video_id}")
+            return "Successfully indexed.", video_id
+    except Exception as e:
+        print(f"Error during yt-dlp execution: {e}")
+        return f"Failed to index due to error: {e}", []
 
-# -----------------------
-# API Endpoints
-# -----------------------
 @app.route('/')
 def root():
     return jsonify({"message": "Trie Search API is live!"}), 200
@@ -76,22 +74,23 @@ def root():
 def index_caption():
     data = request.json
     video_url = data.get('video_url')
+    print(f"Received index request for URL: {video_url}")
     message, vid = fetch_and_index(video_url)
     return jsonify({"message": message, "video_id": vid})
 
 @app.route('/search', methods=['GET'])
 def search_phrase():
-    phrase = request.args.get('phrase', '').lower().split()
+    raw_phrase = request.args.get('phrase', '')
+    print(f"Search request received for phrase: '{raw_phrase}'")
+    phrase = raw_phrase.lower().split()
     matches = trie.search(phrase)
+    print(f"Search matches found: {matches}")
     return jsonify({"matches": matches})
 
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "ok"}), 200
 
-# -----------------------
-# Correct entry point
-# -----------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=False, host="0.0.0.0", port=port)
