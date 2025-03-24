@@ -5,6 +5,7 @@ import os
 
 app = Flask(__name__)
 
+#
 # -----------------------
 # Trie Implementation
 # -----------------------
@@ -99,4 +100,26 @@ import os
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=False, host="0.0.0.0", port=port)
+
+#-----
+# HEALTH ROUTINE
+#----------------
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "ok"}), 200
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=False, host="0.0.0.0", port=port)
+    
+    
+########
+# HOTFIXES
+###############
+
+@app.route('/')
+def root():
+    return jsonify({"message": "Trie Search API is live!"}), 200
+
 
