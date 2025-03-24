@@ -87,6 +87,9 @@ def search_phrase():
     print(f"Search matches found: {matches}")
     return jsonify({"matches": matches})
 
+def index_debug():
+    return jsonify({"message": "GET on /index hit successfully"}), 200
+
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "ok"}), 200
