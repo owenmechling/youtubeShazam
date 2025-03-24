@@ -5,7 +5,6 @@ import os
 
 app = Flask(__name__)
 
-#
 # -----------------------
 # Trie Implementation
 # -----------------------
@@ -34,9 +33,6 @@ class Trie:
             node = node.children[word]
         return list(node.video_ids) if node.is_end else []
 
-# -----------------------
-# Initialize Trie
-# -----------------------
 trie = Trie()
 
 # -----------------------
@@ -72,6 +68,10 @@ def fetch_and_index(video_url):
 # -----------------------
 # API Endpoints
 # -----------------------
+@app.route('/')
+def root():
+    return jsonify({"message": "Trie Search API is live!"}), 200
+
 @app.route('/index', methods=['POST'])
 def index_caption():
     data = request.json
@@ -85,41 +85,14 @@ def search_phrase():
     matches = trie.search(phrase)
     return jsonify({"matches": matches})
 
-# -----------------------
-# Run Server (local dev)
-# -----------------------
-if __name__ == "__main__":
-    app.run(debug=True)
-
-#------
-# PORT NAVIGATION
-#-----------
-
-import os
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host="0.0.0.0", port=port)
-
-#-----
-# HEALTH ROUTINE
-#----------------
-
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "ok"}), 200
 
+# -----------------------
+# Correct entry point
+# -----------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=False, host="0.0.0.0", port=port)
-    
-    
-########
-# HOTFIXES
-###############
-
-@app.route('/')
-def root():
-    return jsonify({"message": "Trie Search API is live!"}), 200
-
 
