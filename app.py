@@ -38,7 +38,11 @@ def fetch_and_index(video_url):
         'writesubtitles': True,
         'skip_download': True,
         'subtitlesformat': 'vtt',
-        'outtmpl': '%(id)s.%(ext)s'
+        'outtmpl': '%(id)s.%(ext)s',
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9'
+        }
     }
 
     try:
@@ -66,13 +70,13 @@ def fetch_and_index(video_url):
         print(f"Error during yt-dlp execution: {e}")
         return f"Failed to index due to error: {e}", []
 
-@app.route('/ping')
-def ping():
-    return jsonify({"pong": True}), 200
-
 @app.route('/')
 def root():
     return jsonify({"message": "Trie Search API is live!"}), 200
+
+@app.route('/ping')
+def ping():
+    return jsonify({"pong": True}), 200
 
 @app.route('/index', methods=['POST'])
 def index_caption():
@@ -86,7 +90,6 @@ def index_caption():
 def index_debug():
     return jsonify({"message": "GET on /index hit successfully"}), 200
 
-
 @app.route('/search', methods=['GET'])
 def search_phrase():
     raw_phrase = request.args.get('phrase', '')
@@ -95,9 +98,6 @@ def search_phrase():
     matches = trie.search(phrase)
     print(f"Search matches found: {matches}")
     return jsonify({"matches": matches})
-
-def index_debug():
-    return jsonify({"message": "GET on /index hit successfully"}), 200
 
 @app.route('/health', methods=['GET'])
 def health_check():
