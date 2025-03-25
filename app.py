@@ -78,6 +78,11 @@ def index_caption():
     message, vid = fetch_and_index(video_url)
     return jsonify({"message": message, "video_id": vid})
 
+@app.route('/index', methods=['GET'])
+def index_debug():
+    return jsonify({"message": "GET on /index hit successfully"}), 200
+
+
 @app.route('/search', methods=['GET'])
 def search_phrase():
     raw_phrase = request.args.get('phrase', '')
