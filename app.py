@@ -66,6 +66,10 @@ def fetch_and_index(video_url):
         print(f"Error during yt-dlp execution: {e}")
         return f"Failed to index due to error: {e}", []
 
+@app.route('/ping')
+def ping():
+    return jsonify({"pong": True}), 200
+
 @app.route('/')
 def root():
     return jsonify({"message": "Trie Search API is live!"}), 200
