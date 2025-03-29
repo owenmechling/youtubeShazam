@@ -1,109 +1,95 @@
 from flask import Flask, request, jsonify
-from collections import defaultdict
-import yt_dlp
+from flask_cors import CORS
 import os
+import re
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+CORS(app)
 
+UPLOAD_FOLDER = './uploads'
+ALLOWED_EXTENSIONS = {'vtt'}
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Trie Node and Trie structure for indexing class
 class TrieNode:
     def __init__(self):
-        self.children = defaultdict(TrieNode)
+        self.children = {}
         self.video_ids = set()
-        self.is_end = False
 
 class Trie:
     def __init__(self):
         self.root = TrieNode()
 
-    def insert(self, words, video_id):
+    def insert(self, word, video_id):
         node = self.root
-        for word in words:
-            node = node.children[word]
-        node.is_end = True
+        for char in word:
+            if char not in node.children:
+                node.children[char] = TrieNode()
+            node = node.children[char]
         node.video_ids.add(video_id)
 
-    def search(self, words):
+    def search(self, phrase):
         node = self.root
-        for word in words:
-            if word not in node.children:
+        for char in phrase:
+            if char in node.children:
+                node = node.children[char]
+            else:
                 return []
-            node = node.children[word]
-        return list(node.video_ids) if node.is_end else []
+        return list(node.video_ids)
 
+# Global trie instance
 trie = Trie()
 
-def fetch_and_index(video_url):
-    print(f"Starting yt-dlp for {video_url}")
-    ydl_opts = {
-        'writesubtitles': True,
-        'skip_download': True,
-        'subtitlesformat': 'vtt',
-        'outtmpl': '%(id)s.%(ext)s',
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36',
-            'Accept-Language': 'en-US,en;q=0.9'
-        }
-    }
+# Utils
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
-            video_id = info.get('id', '')
-            caption_file = f"{video_id}.en.vtt"
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-            if not os.path.exists(caption_file):
-                print(f"No captions downloaded for video ID: {video_id}")
-                return "No captions found or subtitles unavailable.", []
+def parse_vtt_and_index(filepath, video_id):
+    with open(filepath, 'r', encoding='utf-8') as file:
+        lines = file.readlines()
+        
+    text_lines = [line.strip() for line in lines if re.match(r'^[a-zA-Z]', line.strip())]
+    for line in text_lines:
+        words = re.findall(r'\w+', line.lower())
+        for word in words:
+            trie.insert(word, video_id)
 
-            with open(caption_file, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if line.strip() and "-->":
-                        continue
-                    words = line.strip().lower().split()
-                    if words:
-                        trie.insert(words, video_id)
+# Routes
 
-            os.remove(caption_file)
-            print(f"Indexed video ID: {video_id}")
-            return "Successfully indexed.", video_id
-    except Exception as e:
-        print(f"Error during yt-dlp execution: {e}")
-        return f"Failed to index due to error: {e}", []
-
-@app.route('/')
-def root():
-    return jsonify({"message": "Trie Search API is live!"}), 200
-
-@app.route('/ping')
+@app.route("/ping")
 def ping():
-    return jsonify({"pong": True}), 200
+    return jsonify({"pong": True})
 
-@app.route('/index', methods=['POST'])
-def index_caption():
-    data = request.json
-    video_url = data.get('video_url')
-    print(f"Received index request for URL: {video_url}")
-    message, vid = fetch_and_index(video_url)
-    return jsonify({"message": message, "video_id": vid})
+@app.route("/upload", methods=['POST'])
+def upload_caption():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part in request"}), 400
+    
+    file = request.files['file']
+    video_id = request.form.get('video_id', None)
 
-@app.route('/index', methods=['GET'])
-def index_debug():
-    return jsonify({"message": "GET on /index hit successfully"}), 200
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
 
-@app.route('/search', methods=['GET'])
-def search_phrase():
-    raw_phrase = request.args.get('phrase', '')
-    print(f"Search request received for phrase: '{raw_phrase}'")
-    phrase = raw_phrase.lower().split()
+    if file and allowed_file(file.filename) and video_id:
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        
+        parse_vtt_and_index(filepath, video_id)
+        return jsonify({"message": "File uploaded and indexed successfully."})
+    else:
+        return jsonify({"error": "Invalid file or missing video ID."}), 400
+
+@app.route("/search")
+def search():
+    phrase = request.args.get("phrase", "").lower()
     matches = trie.search(phrase)
-    print(f"Search matches found: {matches}")
     return jsonify({"matches": matches})
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    return jsonify({"status": "ok"}), 200
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host="0.0.0.0", port=port)
+    app.run(debug=True)
 
