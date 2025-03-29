@@ -84,11 +84,20 @@ def upload_caption():
     else:
         return jsonify({"error": "Invalid file or missing video ID."}), 400
 
-@app.route("/search")
-def search():
-    phrase = request.args.get("phrase", "").lower()
-    matches = trie.search(phrase)
+@app.route('/search')
+def search_phrase():
+    raw_phrase = request.args.get("phrase", "")
+    words = raw_phrase.lower().split()
+
+    # Find intersection of matches for each word
+    if not words:
+        return jsonify({"matches": []})
+
+    result_sets = [set(trie.search(word)) for word in words]
+    matches = list(set.intersection(*result_sets)) if result_sets else []
+
     return jsonify({"matches": matches})
+
 
 if __name__ == "__main__":
     app.run(debug=True)
