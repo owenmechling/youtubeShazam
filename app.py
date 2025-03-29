@@ -30,9 +30,9 @@ class Trie:
             node = node.children[char]
         node.video_ids.add(video_id)
 
-    def search(self, phrase):
+    def search(self, word):
         node = self.root
-        for char in phrase:
+        for char in word:
             if char in node.children:
                 node = node.children[char]
             else:
@@ -84,12 +84,11 @@ def upload_caption():
     else:
         return jsonify({"error": "Invalid file or missing video ID."}), 400
 
-@app.route('/search')
-def search_phrase():
+@app.route("/search")
+def search():
     raw_phrase = request.args.get("phrase", "")
     words = raw_phrase.lower().split()
 
-    # Find intersection of matches for each word
     if not words:
         return jsonify({"matches": []})
 
@@ -98,7 +97,7 @@ def search_phrase():
 
     return jsonify({"matches": matches})
 
-
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, host="0.0.0.0", port=port)
 
