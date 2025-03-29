@@ -42,6 +42,13 @@ class Trie:
 # Global trie instance
 trie = Trie()
 
+# Re-index all .vtt files on startup
+for filename in os.listdir(UPLOAD_FOLDER):
+    if filename.endswith(".vtt"):
+        video_id = filename.rsplit('.', 1)[0]
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        parse_vtt_and_index(filepath, video_id)
+
 # Utils
 
 def allowed_file(filename):
@@ -50,8 +57,9 @@ def allowed_file(filename):
 def parse_vtt_and_index(filepath, video_id):
     with open(filepath, 'r', encoding='utf-8') as file:
         lines = file.readlines()
-        
-    text_lines = [line.strip() for line in lines if re.match(r'^[a-zA-Z]', line.strip())]
+
+    # New filtering logic: ignore timestamps and keep non-empty lines
+    text_lines = [line.strip() for line in lines if '-->' not in line and line.strip()]
     for line in text_lines:
         words = re.findall(r'\w+', line.lower())
         for word in words:
@@ -67,7 +75,7 @@ def ping():
 def upload_caption():
     if 'file' not in request.files:
         return jsonify({"error": "No file part in request"}), 400
-    
+
     file = request.files['file']
     video_id = request.form.get('video_id', None)
 
@@ -78,7 +86,7 @@ def upload_caption():
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
-        
+
         parse_vtt_and_index(filepath, video_id)
         return jsonify({"message": "File uploaded and indexed successfully."})
     else:
